@@ -22,8 +22,7 @@ import { CodeFile, TranslationFile } from './file-store.types';
 export class FileStore {
   private readonly _className = 'FileLocationStore';
   private static instance: FileStore;
-  private readonly fileLocations: Map<string, TranslationFile | CodeFile> =
-    new Map();
+  private readonly files: Map<string, TranslationFile | CodeFile> = new Map();
   private readonly _logger: Logger;
 
   private constructor() {
@@ -55,7 +54,7 @@ export class FileStore {
         fileSearchLocation.filePattern,
         fileSearchLocation.ignorePattern
       );
-      files.forEach(file => this.addOrUpdateFile(file));
+      files.forEach(file => this.addOrUpdateFileAsync(file));
       this._logger.log(
         LogLevel.INFO,
         `Found ${files.length} number of files for search pattern ${fileSearchLocation.filePattern as string}, ignoring ${fileSearchLocation.ignorePattern as string} and .gitignore patterns.`,
@@ -69,14 +68,22 @@ export class FileStore {
    * Removes all file locations from the store.
    */
   public async clearStoreAsync() {
-    this.fileLocations.clear();
+    this.files.clear();
+  }
+
+  /**
+   * Adds files to the store.
+   * @param uri The URIs of the files.
+   */
+  public async addOrUpdateFilesAsync(uri: vscode.Uri[]) {
+    uri.forEach(file => this.addOrUpdateFileAsync(file));
   }
 
   /**
    * Adds a file to the store.
    * @param uri The URI of the file.
    */
-  public async addOrUpdateFile(uri: vscode.Uri) {
+  public async addOrUpdateFileAsync(uri: vscode.Uri) {
     const fileType = this.determineFileType(uri);
     let file: TranslationFile | CodeFile;
 
@@ -89,7 +96,7 @@ export class FileStore {
         break;
     }
 
-    this.fileLocations.set(uri.fsPath, file);
+    this.files.set(uri.fsPath, file);
 
     this._logger.log(
       LogLevel.VERBOSE,
@@ -98,8 +105,27 @@ export class FileStore {
     );
   }
 
+  public async getFileAsync(uri: vscode.Uri) {
+    if (!this.hasFile(uri)) {
+      await this.addOrUpdateFileAsync(uri);
+    }
+
+    const file = this.files.get(uri.fsPath);
+
+    if (!file) {
+      throw new Error(`File not found: ${uri.fsPath}`);
+    }
+
+    if (file.type === 'translation') {
+      return file satisfies TranslationFile;
+    } else {
+      return file satisfies CodeFile;
+    }
+  }
+
   async createTranslationFileAsync(uri: vscode.Uri): Promise<TranslationFile> {
     const fileContent = await new FileReader().readWorkspaceFileAsync(uri);
+    const jsonContent = JSON.parse(fileContent) as JSON;
     const language = extractLocaleFromFileUri(uri);
     const namespace = extractNamespaceFromFileUri(uri);
     const stats = fs.statSync(uri.fsPath);
@@ -107,7 +133,8 @@ export class FileStore {
     const keys = await extractTranslationKeys(uri);
 
     const translationFile = {
-      content: fileContent,
+      type: 'translation',
+      jsonContent: jsonContent,
       language: language,
       namespace: namespace,
       keys: keys,
@@ -163,6 +190,7 @@ export class FileStore {
     const lastModified = stats.mtime;
 
     const codeFile = {
+      type: 'code',
       content: fileContent,
       metaData: {
         entryLastModified: lastModified,
@@ -175,7 +203,7 @@ export class FileStore {
   }
 
   public deleteFile(uri: vscode.Uri) {
-    this.fileLocations.delete(uri.fsPath);
+    this.files.delete(uri.fsPath);
 
     this._logger.log(
       LogLevel.VERBOSE,
@@ -185,19 +213,19 @@ export class FileStore {
   }
 
   public getCodeFiles(): CodeFile[] {
-    return Array.from(this.fileLocations.values())
+    return Array.from(this.files.values())
       .filter(file => file.metaData.type === FileType.Code)
       .map(file => file as CodeFile);
   }
 
   public getTranslationFiles(): TranslationFile[] {
-    return Array.from(this.fileLocations.values())
+    return Array.from(this.files.values())
       .filter(file => file.metaData.type === FileType.Translation)
       .map(file => file as TranslationFile);
   }
 
   public hasFile(uri: vscode.Uri): boolean {
-    return this.fileLocations.has(uri.fsPath);
+    return this.files.has(uri.fsPath);
   }
 
   private determineFileType(uri: vscode.Uri) {

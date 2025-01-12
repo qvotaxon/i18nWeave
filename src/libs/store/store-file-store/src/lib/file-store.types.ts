@@ -14,15 +14,19 @@ type Metadata = {
 };
 
 type FileData = {
-  content: string;
   metaData: Metadata;
 };
 
 export type TranslationFile = {
+  type: 'translation';
   language: string;
   namespace: string;
   dialect?: string;
   keys: Record<string, TranslationKeyData>;
+  jsonContent: JSON;
 } & FileData;
 
-export type CodeFile = FileData;
+export type CodeFile = {
+  type: 'code';
+  content: string;
+} & FileData;

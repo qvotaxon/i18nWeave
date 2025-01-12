@@ -16,15 +16,16 @@ import { FileWriter } from '@i18n-weave/file-io/file-io-file-writer';
 
 import { FileLockStore } from '@i18n-weave/store/store-file-lock-store';
 import { FileStore } from '@i18n-weave/store/store-file-store';
-import { TranslationStore } from '@i18n-weave/store/store-translation-store';
 
+// import { TranslationStore } from '@i18n-weave/store/store-translation-store';
 import {
   ConfigurationStoreManager,
   GeneralConfiguration,
 } from '@i18n-weave/util/util-configuration';
-import { applyChange } from '@i18n-weave/util/util-file-diff';
+import { applyChange, diffJsonObjects } from '@i18n-weave/util/util-file-diff';
 import { extractLocaleFromFileUri } from '@i18n-weave/util/util-file-path-utilities';
 import { LogLevel } from '@i18n-weave/util/util-logger';
+import { neverReached } from '@i18n-weave/util/util-util-never';
 
 import { TranslationModuleContext } from './translation-module-context';
 
@@ -42,10 +43,26 @@ export class TranslationModule extends BaseActionModule {
       return;
     }
 
-    const diffs = TranslationStore.getInstance().getTranslationFileDiffs(
-      context.inputPath,
-      context.jsonContent
+    const currentTranslationFile = await FileStore.getInstance().getFileAsync(
+      context.inputPath
     );
+    if (currentTranslationFile.type !== 'translation') {
+      neverReached(
+        `File ${context.inputPath.fsPath} is not a translation file.`
+      );
+    }
+
+    const newJsonContent = JSON.parse(context.jsonContent);
+
+    const diffs = diffJsonObjects(
+      currentTranslationFile.jsonContent ?? {},
+      newJsonContent
+    );
+
+    // const diffs = TranslationStore.getInstance().getTranslationFileDiffs(
+    //   context.inputPath,
+    //   context.jsonContent
+    // );
     if (!diffs || diffs.length === 0) {
       this.logger.log(
         LogLevel.VERBOSE,
@@ -55,8 +72,6 @@ export class TranslationModule extends BaseActionModule {
       return;
     }
 
-    await FileStore.getInstance().addOrUpdateFile(context.inputPath);
-
     const changesToTranslate = this.extractRelevantChanges(diffs);
     if (changesToTranslate.length === 0) {
       this.logger.log(
@@ -64,6 +79,7 @@ export class TranslationModule extends BaseActionModule {
         `No diff changes to translate. Skipping.`,
         this._className
       );
+      await FileStore.getInstance().addOrUpdateFileAsync(context.inputPath);
       return;
     }
 
@@ -87,10 +103,11 @@ export class TranslationModule extends BaseActionModule {
         translationsByLanguage,
         config
       );
-      TranslationStore.getInstance().updateEntry(
-        context.inputPath,
-        context.jsonContent
-      );
+      // TranslationStore.getInstance().updateEntry(
+      //   context.inputPath,
+      //   context.jsonContent
+      // );
+      await FileStore.getInstance().addOrUpdateFileAsync(context.inputPath);
     } catch (error) {
       this.logger.log(
         LogLevel.ERROR,
@@ -249,8 +266,8 @@ export class TranslationModule extends BaseActionModule {
           }, 500);
         });
 
-        TranslationStore.getInstance().updateEntry(fileUri, stringifiedContent);
-        FileStore.getInstance().addOrUpdateFile(fileUri);
+        // TranslationStore.getInstance().updateEntry(fileUri, stringifiedContent);
+        FileStore.getInstance().addOrUpdateFileAsync(fileUri);
       }
     }
   }

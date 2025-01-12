@@ -106,7 +106,7 @@ suite('FileWatcherCreator', () => {
       createFileSystemWatcherStub.returns(mockFileWatcher);
       hasFileLockStub.returns(false);
 
-      FileStore.getInstance().addOrUpdateFile(mockUri);
+      FileStore.getInstance().addOrUpdateFileAsync(mockUri);
 
       await fileWatcherCreator.createFileWatchersForFileTypeAsync(
         FileType.Code,

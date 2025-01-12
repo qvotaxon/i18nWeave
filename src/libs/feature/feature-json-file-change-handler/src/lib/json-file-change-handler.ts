@@ -12,8 +12,8 @@ import { FileWatcherCreator } from '@i18n-weave/feature/feature-file-watcher-cre
 import { ModuleChainManager } from '@i18n-weave/feature/feature-module-chain-manager';
 
 import { FileLockStore } from '@i18n-weave/store/store-file-lock-store';
-import { FileStore } from '@i18n-weave/store/store-file-store';
 
+// import { FileStore } from '@i18n-weave/store/store-file-store';
 import { TraceMethod } from '@i18n-weave/util/util-decorators';
 import { ChainType } from '@i18n-weave/util/util-enums';
 import { extractFileUriParts } from '@i18n-weave/util/util-file-path-utilities';
@@ -89,7 +89,7 @@ export class JsonFileChangeHandler extends BaseFileChangeHandler {
       return Promise.resolve();
     }
 
-    await FileStore.getInstance().addOrUpdateFile(changeFileLocation);
+    // await FileStore.getInstance().addOrUpdateFileAsync(changeFileLocation);
 
     if (FileLockStore.getInstance().hasFileLock(changeFileLocation)) {
       return Promise.resolve();

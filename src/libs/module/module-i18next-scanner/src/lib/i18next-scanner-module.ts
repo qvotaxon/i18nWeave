@@ -58,6 +58,8 @@ export class I18nextScannerModule extends BaseActionModule {
             'I18nextScannerModule'
           );
         }, 1000);
+
+        FileStore.getInstance().addOrUpdateFilesAsync(translationFileUris);
       };
 
       if (
